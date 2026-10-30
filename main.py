@@ -6,6 +6,7 @@ from fastapi.templating import Jinja2Templates
 
 from pathlib import Path
 from auth.router import router as auth_router
+from blog.router import router as blog_router
 
 
 app = FastAPI(
@@ -46,6 +47,7 @@ async def health_check():
 
 
 app.include_router(auth_router, prefix="")
+app.include_router(blog_router, prefix="")
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
