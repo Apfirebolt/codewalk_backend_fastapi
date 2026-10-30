@@ -1,8 +1,9 @@
-from fastapi import APIRouter, status, HTTPException, Depends, Query
+from fastapi import APIRouter, status, HTTPException, Depends, Query, UploadFile, File
 from typing import List, Optional
 from . import schema, services
 from auth.jwt import get_current_user
 import auth.schema as auth_schema
+from utils.cloudinary_helper import upload_image_to_cloudinary
 
 router = APIRouter(tags=['Content (Blog, Projects, Gallery)'], prefix='/api/content')
 
@@ -28,6 +29,29 @@ async def get_all_content_items(
 async def get_content_item_by_slug(slug: str):
     """Get a specific content item by its URL slug (auto increments view count)"""
     return await services.fetch_content_by_slug(slug)
+
+@router.post('/upload-image')
+async def upload_editor_image(
+    file: UploadFile = File(...),
+    current_user: auth_schema.TokenData = Depends(get_current_user)
+):
+    """Upload an inline image from Editor.js to Cloudinary via backend"""
+    try:
+        # Use your existing Cloudinary helper function
+        secure_url = await upload_image_to_cloudinary(file)
+        
+        # Editor.js strictly expects this response structure on success
+        return {
+            "success": 1,
+            "file": {
+                "url": secure_url
+            }
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Image upload failed: {str(e)}"
+        )
 
 
 @router.put('/{item_id}', response_model=schema.ContentItemResponse)
