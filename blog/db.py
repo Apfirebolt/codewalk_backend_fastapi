@@ -1,8 +1,7 @@
 from typing import List, Optional, Dict, Any
 from fastapi.concurrency import run_in_threadpool
-from sqlalchemy.orm import Session
-from sqlalchemy import select, or_
-from slugify import slugify  # pip install python-slugify
+from sqlalchemy.orm import Session, joinedload
+from slugify import slugify
 
 from config import db as sync_db
 from . import models
@@ -27,7 +26,6 @@ def _create_content_sync(user_id: int, data: Dict[str, Any], tag_names: List[str
         base_slug = slugify(data["title"])
         slug = base_slug
         counter = 1
-        # Ensure unique slug
         while db.query(models.ContentItem).filter(models.ContentItem.slug == slug).first():
             slug = f"{base_slug}-{counter}"
             counter += 1
@@ -48,8 +46,14 @@ def _create_content_sync(user_id: int, data: Dict[str, Any], tag_names: List[str
         )
         db.add(new_item)
         db.commit()
-        db.refresh(new_item)
-        return new_item
+        item_id = new_item.id
+        db.close()
+
+        # Re-query with joinedload in a fresh session
+        db = sync_db.SessionLocal()
+        return db.query(models.ContentItem).options(
+            joinedload(models.ContentItem.tags)
+        ).filter(models.ContentItem.id == item_id).first()
     except Exception:
         db.rollback()
         raise
@@ -59,7 +63,7 @@ def _create_content_sync(user_id: int, data: Dict[str, Any], tag_names: List[str
 def _get_all_content_sync(content_type: Optional[str] = None) -> List[models.ContentItem]:
     db: Session = sync_db.SessionLocal()
     try:
-        query = db.query(models.ContentItem)
+        query = db.query(models.ContentItem).options(joinedload(models.ContentItem.tags))
         if content_type:
             query = query.filter(models.ContentItem.content_type == content_type)
         return query.order_by(models.ContentItem.date_posted.desc()).all()
@@ -69,7 +73,10 @@ def _get_all_content_sync(content_type: Optional[str] = None) -> List[models.Con
 def _get_content_by_slug_sync(slug: str) -> Optional[models.ContentItem]:
     db: Session = sync_db.SessionLocal()
     try:
-        item = db.query(models.ContentItem).filter(models.ContentItem.slug == slug).first()
+        item = db.query(models.ContentItem).options(
+            joinedload(models.ContentItem.tags)
+        ).filter(models.ContentItem.slug == slug).first()
+        
         if item:
             item.views += 1
             db.commit()
@@ -81,7 +88,10 @@ def _get_content_by_slug_sync(slug: str) -> Optional[models.ContentItem]:
 def _update_content_sync(item_id: int, update_data: Dict[str, Any], tag_names: Optional[List[str]]) -> models.ContentItem:
     db: Session = sync_db.SessionLocal()
     try:
-        item = db.query(models.ContentItem).filter(models.ContentItem.id == item_id).first()
+        item = db.query(models.ContentItem).options(
+            joinedload(models.ContentItem.tags)
+        ).filter(models.ContentItem.id == item_id).first()
+        
         if not item:
             raise Exception("Content item not found")
 
