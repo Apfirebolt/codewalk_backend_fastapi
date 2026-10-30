@@ -11,6 +11,7 @@ load_dotenv()
 # Import Base metadata and models for autogenerate detection
 from config.db import Base
 from auth.models import User
+from blog.models import ContentItem, Tag
 
 
 # Alembic Config object
