@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Codewalk Blogging API</title>
+  <!-- Compiled and minified CSS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+  <!-- Material Icons -->
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <style>
+    body {
+      display: flex;
+      min-height: 100vh;
+      flex-direction: column;
+      background-color: #f8f9fa;
+    }
+    main {
+      flex: 1 0 auto;
+    }
+    .hero-card {
+      margin-top: 5vh;
+      border-radius: 20px;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Navigation Bar -->
+  <nav class="indigo darken-3">
+    <div class="nav-wrapper container">
+      <a href="#" class="brand-logo">Softgenie Journal API</a>
+      <ul id="nav-mobile" class="right hide-on-med-and-down">
+        <li><a href="/docs" target="_blank"><i class="material-icons left">code</i>Swagger Docs</a></li>
+        <li><a href="/redoc" target="_blank"><i class="material-icons left">menu_book</i>ReDoc</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="container">
+    <div class="row">
+      <div class="col s12 m8 offset-m2">
+        <div class="card hero-card z-depth-2">
+          <div class="card-content">
+            <span class="card-title indigo-text text-darken-3 font-weight-bold">
+              <i class="material-icons left">dns</i>Backend Service Operational
+            </span>
+            <p class="grey-text text-darken-1">
+              The FastAPI backend server for the Log Journal platform is live, managed by Supervisor, and securely proxied via Nginx.
+            </p>
+
+            <div class="divider my-4" style="margin: 20px 0;"></div>
+
+            <!-- Health Status Badge -->
+            <div class="chip" id="health-status-chip">
+              <i class="material-icons" id="health-icon">hourglass_empty</i>
+              Checking API Health...
+            </div>
+
+            <div class="collection mt-4" style="margin-top: 20px;">
+              <a href="/api/health" target="_blank" class="collection-item">
+                <i class="material-icons left grey-text">check_circle</i> /api/health Endpoint
+              </a>
+              <a href="/docs" target="_blank" class="collection-item">
+                <i class="material-icons left grey-text">code</i> /docs (Swagger OpenAPI UI)
+              </a>
+              <a href="/openapi.json" target="_blank" class="collection-item">
+                <i class="material-icons left grey-text">data_object</i> /openapi.json Schema
+              </a>
+            </div>
+          </div>
+
+          <div class="card-action grey lighten-4">
+            <a href="https://journal.softgenie.org" target="_blank" class="indigo-text text-darken-3 font-weight-bold">Open Frontend App &rarr;</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <page-footer class="page-footer indigo darken-4">
+    <div class="container">
+      <div class="row">
+        <div class="col l6 s12">
+          <h5 class="white-text">Softgenie Journal</h5>
+          <p class="grey-text text-lighten-4">Secure, responsive, and robust backend infrastructure.</p>
+        </div>
+      </div>
+    </div>
+    <div class="footer-copyright">
+      <div class="container">
+        © 2026 Softgenie
+      </div>
+    </div>
+  </page-footer>
+
+  <!-- Compiled and minified JavaScript -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+  <script>
+    // Simple script to test health check endpoint on load
+    document.addEventListener('DOMContentLoaded', function() {
+      const chip = document.getElementById('health-status-chip');
+      const icon = document.getElementById('health-icon');
+
+      fetch('/api/health')
+        .then(response => response.json())
+        .then(data => {
+          chip.style.backgroundColor = '#e8f5e9';
+          chip.style.color = '#2e7d32';
+          icon.textContent = 'check_circle';
+          icon.style.color = '#2e7d32';
+          chip.innerHTML = `<i class="material-icons left" style="color: #2e7d32;">check_circle</i> Status: Healthy (${data.message})`;
+        })
+        .catch(error => {
+          chip.style.backgroundColor = '#ffebee';
+          chip.style.color = '#c62828';
+          icon.textContent = 'error';
+          icon.style.color = '#c62828';
+          chip.innerHTML = `<i class="material-icons left" style="color: #c62828;">error</i> Status: Unreachable`;
+        });
+    });
+  </script>
+</body>
+</html>
