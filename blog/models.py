@@ -2,6 +2,7 @@ from sqlalchemy import Boolean, Column, Integer, String, ForeignKey, DateTime, T
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from enum import Enum
+from datetime import datetime, timezone
 from config.db import Base
 
 # Enum for sections
@@ -46,6 +47,7 @@ class ContentItem(Base):
 
     # Relationships
     tags = relationship("Tag", secondary=content_tags_association, back_populates="contents")
+    comments = relationship("Comment", back_populates="content_item", cascade="all, delete-orphan")
 
 
 class Tag(Base):
@@ -60,3 +62,28 @@ class Tag(Base):
 
     # Relationship back to content items
     contents = relationship("ContentItem", secondary=content_tags_association, back_populates="tags")
+
+
+class Comment(Base):
+    __tablename__ = "comments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    content_id = Column(Integer, ForeignKey("content_items.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("user.id", ondelete="CASCADE"), nullable=False)
+    
+    # Self-referential relationship for nested replies
+    parent_id = Column(Integer, ForeignKey("comments.id", ondelete="CASCADE"), nullable=True, index=True)
+    
+    body = Column(Text, nullable=False)
+    date_created = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    is_edited = Column(Boolean, default=False)
+
+    # Relationships
+    content_item = relationship("ContentItem", back_populates="comments")
+    user = relationship("User") # Assumes you have a User model defined
+    
+    # Parent comment (if this is a reply)
+    parent = relationship("Comment", remote_side=[id], back_populates="replies")
+    
+    # Nested replies (cascade delete ensures child replies wipe out when parent is deleted)
+    replies = relationship("Comment", back_populates="parent", cascade="all, delete-orphan")

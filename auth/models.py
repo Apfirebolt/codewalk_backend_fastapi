@@ -16,6 +16,8 @@ class User(Base):
     password = Column(String(255))
     profile_image = Column(String(500), nullable=True)
 
+    comments = relationship("Comment", back_populates="user", cascade="all, delete-orphan")
+
     def __init__(self, username: str, email: str, role: str, password: str, first_name: str = None, last_name: str = None, profile_image: str = None, *args: Any, **kwargs: Any) -> None:
         self.username = username
         self.email = email

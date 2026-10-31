@@ -51,3 +51,40 @@ class ContentItemResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# --- COMMENT SCHEMAS ---
+
+class CommentCreate(BaseModel):
+    body: str = Field(..., min_length=1, description="Comment body text")
+    parent_id: Optional[int] = Field(None, description="ID of the parent comment if this is a nested reply")
+
+class CommentUpdate(BaseModel):
+    body: str = Field(..., min_length=1, description="Updated comment body text")
+
+class AuthorResponse(BaseModel):
+    id: int
+    username: str
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    profile_image: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+class CommentResponse(BaseModel):
+    id: int
+    content_id: int
+    user_id: int
+    parent_id: Optional[int] = None
+    body: str
+    date_created: datetime
+    is_edited: bool
+    user: Optional[AuthorResponse] = None
+    replies: List['CommentResponse'] = []  # Recursively holds nested replies
+
+    class Config:
+        from_attributes = True
+
+# Required for recursive self-referencing Pydantic models in Python
+CommentResponse.model_rebuild()

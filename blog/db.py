@@ -175,7 +175,90 @@ def _delete_content_sync(item_id: int) -> bool:
     finally:
         db.close()
 
-# Async wrappers using thread pool
+
+# --- COMMENT OPERATIONS ---
+
+def _get_comments_by_content_id_sync(content_id: int) -> List[models.Comment]:
+    db: Session = sync_db.SessionLocal()
+    try:
+        # Fetch only top-level comments (parent_id is None). 
+        # SQLAlchemy relationship lazy/joined configuration will handle nested replies.
+        return db.query(models.Comment).filter(
+            models.Comment.content_id == content_id,
+            models.Comment.parent_id == None
+        ).order_by(models.Comment.date_posted.desc()).all()
+    finally:
+        db.close()
+
+def _create_comment_sync(content_id: int, user_id: int, body: str, parent_id: Optional[int] = None) -> models.Comment:
+    db: Session = sync_db.SessionLocal()
+    try:
+        if parent_id:
+            parent_comment = db.query(models.Comment).filter(models.Comment.id == parent_id).first()
+            if not parent_comment:
+                raise Exception("Parent comment not found")
+            if parent_comment.content_id != content_id:
+                raise Exception("Parent comment does not belong to this content item")
+
+        comment = models.Comment(
+            content_id=content_id,
+            user_id=user_id,
+            body=body,
+            parent_id=parent_id
+        )
+        db.add(comment)
+        db.commit()
+        db.refresh(comment)
+        return comment
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+def _update_comment_sync(comment_id: int, user_id: int, new_body: str) -> models.Comment:
+    db: Session = sync_db.SessionLocal()
+    try:
+        comment = db.query(models.Comment).filter(models.Comment.id == comment_id).first()
+        if not comment:
+            raise Exception("Comment not found")
+        if comment.user_id != user_id:
+            raise Exception("Unauthorized to edit this comment")
+
+        comment.body = new_body
+        comment.is_edited = True
+        db.commit()
+        db.refresh(comment)
+        return comment
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+def _delete_comment_sync(comment_id: int, user_id: int, is_admin: bool = False) -> bool:
+    db: Session = sync_db.SessionLocal()
+    try:
+        comment = db.query(models.Comment).filter(models.Comment.id == comment_id).first()
+        if not comment:
+            return False
+        
+        # Allow deletion if user owns the comment or is an admin
+        if comment.user_id != user_id and not is_admin:
+            raise Exception("Unauthorized to delete this comment")
+
+        db.delete(comment)
+        db.commit()
+        return True
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
+# --- ASYNC WRAPPERS USING THREAD POOL ---
+
 async def create_content(user_id: int, data: Dict[str, Any], tag_names: List[str]) -> models.ContentItem:
     return await run_in_threadpool(_create_content_sync, user_id, data, tag_names)
 
@@ -190,3 +273,15 @@ async def update_content(item_id: int, update_data: Dict[str, Any], tag_names: O
 
 async def delete_content(item_id: int) -> bool:
     return await run_in_threadpool(_delete_content_sync, item_id)
+
+async def get_comments_by_content_id(content_id: int) -> List[models.Comment]:
+    return await run_in_threadpool(_get_comments_by_content_id_sync, content_id)
+
+async def create_comment(content_id: int, user_id: int, body: str, parent_id: Optional[int] = None) -> models.Comment:
+    return await run_in_threadpool(_create_comment_sync, content_id, user_id, body, parent_id)
+
+async def update_comment(comment_id: int, user_id: int, new_body: str) -> models.Comment:
+    return await run_in_threadpool(_update_comment_sync, comment_id, user_id, new_body)
+
+async def delete_comment(comment_id: int, user_id: int, is_admin: bool = False) -> bool:
+    return await run_in_threadpool(_delete_comment_sync, comment_id, user_id, is_admin)
