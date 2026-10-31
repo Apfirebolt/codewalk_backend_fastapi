@@ -2,9 +2,35 @@ from typing import List, Optional, Dict, Any
 from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session, joinedload
 from slugify import slugify
-
+import os
+import re
+import cloudinary
+from urllib.parse import urlparse
 from config import db as sync_db
 from . import models
+
+
+def _extract_cloudinary_public_id(url: str) -> Optional[str]:
+    """Extracts Cloudinary public ID from a secure URL for deletion."""
+    try:
+        parsed_url = urlparse(url)
+        path_parts = parsed_url.path.split('/')
+        if 'upload' in path_parts:
+            upload_idx = path_parts.index('upload')
+            relevant_parts = path_parts[upload_idx + 1:]
+            
+            # If there's a version string like 'v1711234567', skip it
+            if relevant_parts and re.match(r'^v\d+$', relevant_parts[0]):
+                relevant_parts = relevant_parts[1:]
+                
+            # Join remaining parts and strip extension
+            full_path = "/".join(relevant_parts)
+            public_id, _ = os.path.splitext(full_path)
+            return public_id
+    except Exception:
+        pass
+    return None
+
 
 def _get_or_create_tags_sync(db: Session, tag_names: List[str]) -> List[models.Tag]:
     tags = []
@@ -120,6 +146,26 @@ def _delete_content_sync(item_id: int) -> bool:
         item = db.query(models.ContentItem).filter(models.ContentItem.id == item_id).first()
         if not item:
             return False
+
+        # Extract all image URLs from Editor.js JSON content blocks
+        content_data = item.content or {}
+        blocks = content_data.get("blocks", [])
+        image_urls = [
+            block["data"]["file"]["url"]
+            for block in blocks
+            if block.get("type") == "image" and block.get("data", {}).get("file", {}).get("url")
+        ]
+
+        # Delete images from Cloudinary
+        for url in image_urls:
+            public_id = _extract_cloudinary_public_id(url)
+            if public_id:
+                try:
+                    cloudinary.uploader.destroy(public_id, resource_type="image")
+                except Exception as img_err:
+                    print(f"Failed to delete image from Cloudinary ({public_id}): {img_err}")
+
+        # Delete database record
         db.delete(item)
         db.commit()
         return True

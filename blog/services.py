@@ -3,6 +3,7 @@ from typing import List, Optional
 from . import schema, models
 import blog.db as blog_db
 
+
 async def create_new_content(user_id: int, request: schema.ContentItemCreate) -> models.ContentItem:
     try:
         data = request.dict(exclude={"tag_names"})
