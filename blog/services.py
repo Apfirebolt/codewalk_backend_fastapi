@@ -53,3 +53,59 @@ async def remove_content(item_id: int) -> dict:
             detail="Content item not found"
         )
     return {"message": "Content item deleted successfully"}
+
+
+# --- COMMENT SERVICES ---
+
+async def add_comment_to_content(content_id: int, user_id: int, request: schema.CommentCreate) -> models.Comment:
+    try:
+        return await blog_db.create_comment(
+            content_id=content_id,
+            user_id=user_id,
+            body=request.body,
+            parent_id=request.parent_id
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to post comment: {str(e)}"
+        )
+
+async def fetch_comments_for_content(content_id: int) -> List[models.Comment]:
+    try:
+        return await blog_db.get_comments_by_content_id(content_id)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching comments: {str(e)}"
+        )
+
+async def modify_comment(comment_id: int, user_id: int, request: schema.CommentUpdate) -> models.Comment:
+    try:
+        return await blog_db.update_comment(
+            comment_id=comment_id,
+            user_id=user_id,
+            new_body=request.body
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to update comment: {str(e)}"
+        )
+
+async def remove_comment(comment_id: int, user_id: int, is_admin: bool = False) -> dict:
+    try:
+        success = await blog_db.delete_comment(comment_id, user_id, is_admin)
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Comment not found"
+            )
+        return {"message": "Comment deleted successfully"}
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to delete comment: {str(e)}"
+        )

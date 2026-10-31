@@ -13,7 +13,6 @@ async def create_content_item(
     current_user: auth_schema.TokenData = Depends(get_current_user)
 ):
     """Create a new Blog, Project, or Gallery item with Editor.js content"""
-    # Use user ID from JWT token authentication
     return await services.create_new_content(user_id=current_user.id, request=request)
 
 
@@ -25,11 +24,6 @@ async def get_all_content_items(
     return await services.fetch_all_content(content_type=content_type)
 
 
-@router.get('/{slug}', response_model=schema.ContentItemResponse)
-async def get_content_item_by_slug(slug: str):
-    """Get a specific content item by its URL slug (auto increments view count)"""
-    return await services.fetch_content_by_slug(slug)
-
 @router.post('/upload-image')
 async def upload_editor_image(
     file: UploadFile = File(...),
@@ -37,10 +31,7 @@ async def upload_editor_image(
 ):
     """Upload an inline image from Editor.js to Cloudinary via backend"""
     try:
-        # Use your existing Cloudinary helper function
         secure_url = await upload_image_to_cloudinary(file)
-        
-        # Editor.js strictly expects this response structure on success
         return {
             "success": 1,
             "file": {
@@ -52,6 +43,64 @@ async def upload_editor_image(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Image upload failed: {str(e)}"
         )
+
+
+# --- COMMENT ENDPOINTS (Placed before /{slug} to avoid path parameter conflicts) ---
+
+@router.get('/{content_id}/comments', response_model=List[schema.CommentResponse])
+async def get_comments_for_content_item(content_id: int):
+    """Fetch all top-level comments and nested replies for a specific content item"""
+    return await services.fetch_comments_for_content(content_id=content_id)
+
+
+@router.post('/{content_id}/comments', response_model=schema.CommentResponse, status_code=status.HTTP_201_CREATED)
+async def post_comment_to_content(
+    content_id: int,
+    request: schema.CommentCreate,
+    current_user: auth_schema.TokenData = Depends(get_current_user)
+):
+    """Post a new comment or reply to a specific content item"""
+    return await services.add_comment_to_content(
+        content_id=content_id,
+        user_id=current_user.id,
+        request=request
+    )
+
+
+@router.put('/comments/{comment_id}', response_model=schema.CommentResponse)
+async def update_comment_item(
+    comment_id: int,
+    request: schema.CommentUpdate,
+    current_user: auth_schema.TokenData = Depends(get_current_user)
+):
+    """Update an existing comment body (Owner only)"""
+    return await services.modify_comment(
+        comment_id=comment_id,
+        user_id=current_user.id,
+        request=request
+    )
+
+
+@router.delete('/comments/{comment_id}')
+async def delete_comment_item(
+    comment_id: int,
+    current_user: auth_schema.TokenData = Depends(get_current_user)
+):
+    """Delete a comment by ID (Owner or Admin)"""
+    is_admin = getattr(current_user, "role", "user") == "admin"
+    return await services.remove_comment(
+        comment_id=comment_id,
+        user_id=current_user.id,
+        is_admin=is_admin
+    )
+
+
+# --- GENERAL CONTENT ENDPOINTS ---
+
+@router.get('/{slug}', response_model=schema.ContentItemResponse)
+async def get_content_item_by_slug(slug: str):
+    """Get a specific content item by its URL slug (auto increments view count)"""
+    return await services.fetch_content_by_slug(slug)
 
 
 @router.put('/{item_id}', response_model=schema.ContentItemResponse)
