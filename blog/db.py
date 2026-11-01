@@ -1,6 +1,6 @@
 from typing import List, Optional, Dict, Any
 from fastapi.concurrency import run_in_threadpool
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 from slugify import slugify
 import os
 import re
@@ -181,12 +181,32 @@ def _delete_content_sync(item_id: int) -> bool:
 def _get_comments_by_content_id_sync(content_id: int) -> List[models.Comment]:
     db: Session = sync_db.SessionLocal()
     try:
-        # Fetch only top-level comments (parent_id is None). 
-        # SQLAlchemy relationship lazy/joined configuration will handle nested replies.
-        return db.query(models.Comment).filter(
-            models.Comment.content_id == content_id,
-            models.Comment.parent_id == None
-        ).order_by(models.Comment.date_posted.desc()).all()
+        # Fetch all comments for this content item flatly, eager-loading the user relationship
+        all_comments = db.query(models.Comment).filter(
+            models.Comment.content_id == content_id
+        ).options(
+            joinedload(models.Comment.user)
+        ).order_by(models.Comment.date_created.asc()).all()
+        
+        # Build dictionary map and construct the recursive tree in Python
+        comment_map = {}
+        top_level_comments = []
+
+        for comment in all_comments:
+            comment.replies = []  # Initialize empty replies list
+            comment_map[comment.id] = comment
+
+        for comment in all_comments:
+            if comment.parent_id is None:
+                top_level_comments.append(comment)
+            else:
+                parent = comment_map.get(comment.parent_id)
+                if parent:
+                    parent.replies.append(comment)
+
+        # Sort top-level comments descending (newest first)
+        top_level_comments.sort(key=lambda x: x.date_created, reverse=True)
+        return top_level_comments
     finally:
         db.close()
 
@@ -208,8 +228,17 @@ def _create_comment_sync(content_id: int, user_id: int, body: str, parent_id: Op
         )
         db.add(comment)
         db.commit()
-        db.refresh(comment)
-        return comment
+        comment_id = comment.id
+        db.close()
+
+        # Re-open session and fetch with user eager-loaded
+        db = sync_db.SessionLocal()
+        created = db.query(models.Comment).options(
+            joinedload(models.Comment.user)
+        ).filter(models.Comment.id == comment_id).first()
+        if created:
+            created.replies = []
+        return created
     except Exception:
         db.rollback()
         raise
@@ -228,8 +257,16 @@ def _update_comment_sync(comment_id: int, user_id: int, new_body: str) -> models
         comment.body = new_body
         comment.is_edited = True
         db.commit()
-        db.refresh(comment)
-        return comment
+        comm_id = comment.id
+        db.close()
+
+        db = sync_db.SessionLocal()
+        updated = db.query(models.Comment).options(
+            joinedload(models.Comment.user)
+        ).filter(models.Comment.id == comm_id).first()
+        if updated:
+            updated.replies = []
+        return updated
     except Exception:
         db.rollback()
         raise
