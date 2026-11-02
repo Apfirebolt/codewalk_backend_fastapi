@@ -24,6 +24,7 @@ templates = Jinja2Templates(directory=BASE_DIR / "templates")
 origins = [
     "http://localhost:3000",
     "http://localhost:8000",
+    "https://codewalk.in/"
 ]
 
 app.add_middleware(
