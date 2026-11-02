@@ -71,6 +71,7 @@ async def login(request: schema.Login):
             id=user.id,
             username=user.username,
             email=user.email,
+            role=getattr(user, 'role', 'user'),
             first_name=getattr(user, 'first_name', None),
             last_name=getattr(user, 'last_name', None),
             profile_image=getattr(user, 'profile_image', None)

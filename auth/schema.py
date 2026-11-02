@@ -20,6 +20,7 @@ class DisplayAccount(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     profile_image: Optional[str] = None
+    role: str = "user"
 
     class Config:
         from_attributes = True
