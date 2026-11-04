@@ -8,7 +8,15 @@ async def create_new_content(user_id: int, request: schema.ContentItemCreate) ->
     try:
         data = request.dict(exclude={"tag_names"})
         tags = request.tag_names or []
+        # only users with admin role can create new content
+        if not blog_db.is_user_admin(user_id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only admin users can create new content"
+            )
         return await blog_db.create_content(user_id=user_id, data=data, tag_names=tags)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

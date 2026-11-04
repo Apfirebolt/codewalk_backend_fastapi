@@ -18,8 +18,13 @@ async def new_user_register(request: schema.User) -> models.User:
         )
 
 
-async def all_users() -> List[models.User]:
+async def all_users(user_id: int) -> List[models.User]:
     try:
+        if not user_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User ID is required"
+            )
         users = await auth_db.get_all_users()
         return users
     except Exception as e:

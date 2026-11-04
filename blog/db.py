@@ -8,6 +8,7 @@ import cloudinary
 from urllib.parse import urlparse
 from config import db as sync_db
 from . import models
+from auth import models as auth_models
 
 
 def _extract_cloudinary_public_id(url: str) -> Optional[str]:
@@ -172,6 +173,16 @@ def _delete_content_sync(item_id: int) -> bool:
     except Exception:
         db.rollback()
         raise
+    finally:
+        db.close()
+
+def is_user_admin(user_id: int) -> bool:
+    db: Session = sync_db.SessionLocal()
+    try:
+        user = db.query(auth_models.User).filter(auth_models.User.id == user_id).first()
+        if not user:
+            return False
+        return user.role == "admin"
     finally:
         db.close()
 

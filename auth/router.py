@@ -34,13 +34,13 @@ async def create_user_registration(request: schema.User):
 
 
 @router.get('/users', response_model=List[schema.DisplayAccount])
-async def get_all_users():
-    return await services.all_users()
+async def get_all_users(current_user: schema.DisplayAccount = Depends(get_current_user)):
+    return await services.all_users(current_user.id)
 
 
 @router.get('/', response_model=List[schema.DisplayAccount])
-async def list_users_root():
-    return await services.all_users()
+async def list_users_root(current_user: schema.DisplayAccount = Depends(get_current_user)):
+    return await services.all_users(current_user.id)
 
 
 @router.post('/login')
